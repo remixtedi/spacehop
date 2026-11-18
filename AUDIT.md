@@ -161,3 +161,60 @@ Tested on this Mac (macOS 27.2.1): setup → 79/81 `enabled=false`; teardown twi
 → `enabled=true`, no error; all other hotkey entries identical before and after.
 Side effect: entries 79/81 gain an explicit `value` with the macOS default
 binding (`[65535, 123|124, 8650752]`, type `standard`) if they had none.
+
+## Accessibility wait
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L629-L668 (file `Sources/Daemon.swift`, `waitForAccessibilityIfNeeded`).
+Does: asks macOS for Accessibility (shows the system prompt once), logs that it
+is waiting, polls once a second, and exits when granted so launchd restarts it
+with the grant applied.
+Private APIs: none (`AXIsProcessTrustedWithOptions`, `AXIsProcessTrusted`).
+Verdict: changed.
+Changes: the 15-second automatic opening of System Settings (L656-L666, via
+`NSWorkspace.open(URL)`) dropped; the system prompt already offers that button.
+This also keeps `openURL:` out of the binary, which the scanner forbids.
+`log` renamed `logLine`.
+
+## Yank guard
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L469-L555 (file `Sources/Daemon.swift`, `installYankGuard`).
+Does: when the visible Space changes to one with no normal windows, spacehop
+makes itself the active app (it has no windows or menus, so nothing appears),
+which stops macOS from pulling you to another Space to follow some other app.
+Private APIs: via `spaceHasWindows` / `activeSpaceID` (Space lookup).
+Verdict: changed.
+Changes: `NOSWOOSH_FORCE_YANK_GUARD` environment override (L537-L542) removed;
+the guard is always on, as upstream defaults to.
+
+## Hotkey
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L680-L700 (file `Sources/Daemon.swift`, `installHotKeys`).
+Does: registers exactly Ctrl+Left and Ctrl+Right with Carbon
+`RegisterEventHotKey`. macOS delivers only those two combinations to the
+process; spacehop never sees any other keystroke. There is no keyboard event tap.
+Private APIs: none.
+Verdict: changed.
+Changes: signature `0x5350_5357` ('SPSW') → `0x5348_4F50` ('SHOP'); the handler
+now ignores hotkey events whose signature isn't ours.
+
+## Swipe tap
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L557-L580, L702-L795 (file `Sources/Daemon.swift`, `swipeCallback`, `installSwipeTap`).
+Does: an event tap that receives only event types 29 (gesture) and 30 (Dock
+control), never keys or mouse. A real horizontal 3-finger swipe is swallowed
+and replaced by one instant switch; direction from progress sign (changed) or
+velocity sign (ended). Vertical swipes and everything else pass through. Our own
+tagged events pass through. A 5-second timer re-enables the tap if macOS
+disabled it.
+Private APIs: event types 29/30 and the undocumented fields listed under
+"macOS 26 swipe".
+Verdict: changed.
+Changes: top-level code wrapped in `installSwipeTap()`; tag renamed. A code-only
+diff against upstream shows nothing else.
+
+## Daemon entry
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L670-L678, L797 (file `Sources/Daemon.swift`, `runDaemon`).
+Does: sets activation policy `.accessory` (no Dock icon, no Cmd-Tab), installs
+the yank guard, hotkeys and swipe tap, logs one line, runs the app loop.
+Verdict: OK.

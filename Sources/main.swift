@@ -9,7 +9,6 @@ import Cocoa
 //   spacehop teardown   turn them back on
 //   spacehop version    print the version
 
-let spacehopVersion = "0.1.0"
 let usage = "usage: spacehop [left | right | setup | teardown | version]\n"
 
 let args = CommandLine.arguments
@@ -30,6 +29,8 @@ case "teardown":
 case "version", "--version":
     print("spacehop \(spacehopVersion)")
     exit(0)
+case "":
+    runDaemon()
 default:
     FileHandle.standardError.write(usage.data(using: .utf8)!)
     exit(1)
