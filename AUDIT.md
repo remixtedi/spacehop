@@ -218,3 +218,169 @@ Source: mmathys/noswoosh@14051ab `noswoosh.swift` L670-L678, L797 (file `Sources
 Does: sets activation policy `.accessory` (no Dock icon, no Cmd-Tab), installs
 the yank guard, hotkeys and swipe tap, logs one line, runs the app loop.
 Verdict: OK.
+
+## Install and uninstall
+
+Source: layout follows mmathys/noswoosh@14051ab `scripts/install.sh` and
+`scripts/uninstall.sh` (files `scripts/install.sh`, `scripts/uninstall.sh`).
+Does: install runs `setup-signing.sh` and `build.sh` (so the scanner always
+runs), copies the binary to `~/.local/bin/spacehop` as a fresh file, runs
+`spacehop setup`, writes and loads a user LaunchAgent
+(`com.remixtedi.spacehop`: RunAtLoad, KeepAlive, Interactive, Aqua session
+only, stderr to `~/Library/Logs/spacehop.log`). Uninstall reverses all of it,
+deletes the signing keychain and `~/.config/spacehop`, and tells the user to
+remove the Accessibility entry by hand.
+Verdict: changed.
+Changes: optional Developer ID signing dropped (local identity always);
+`swiftc` invocation moved into `build.sh`; source file no longer copied next to
+the binary; uninstall also removes the signing identity and log.
+Not automated on purpose: removing the Accessibility entry. `tccutil` can't
+target a bare binary by ID, and `tccutil reset Accessibility` with no ID would
+remove every app's permission.
+
+## Coverage of noswoosh.swift
+
+| Upstream lines | What | Where / outcome |
+|---|---|---|
+| L1-L48 | header comment, version | rewritten (`main.swift`, `Daemon.swift`) |
+| L50-L62 | `runTool` (launches programs) | **dropped** |
+| L64-L84 | Ctrl+arrow system shortcuts | changed, `SystemShortcuts.swift` |
+| L86-L167 | SkyLight reads, space list | ported, `Spaces.swift` |
+| L169-L183 | macOS version | ported, `Spaces.swift` |
+| L185-L192 | `NOSWOOSH_FORCE_AUGMENT` env override | **dropped** |
+| L195-L214 | natural-scrolling sign | changed, `Swipe.swift` |
+| L216-L271 | macOS 26 swipe | ported, `Swipe.swift` |
+| L273-L408 | macOS 27 payload | ported, `Swipe.swift` |
+| L410-L467 | switch core | changed, `Swipe.swift` |
+| L469-L536 | yank guard rationale, `spaceHasWindows` | ported (`Spaces.swift`, `Daemon.swift`) |
+| L537-L542 | `NOSWOOSH_FORCE_YANK_GUARD` env override | **dropped** |
+| L544-L555 | yank guard | ported, `Daemon.swift` |
+| L557-L580 | swipe direction | ported, `Daemon.swift` |
+| L582-L586 | CLI dispatch | changed, `main.swift` |
+| L587-L591 | `list` | **dropped** |
+| L592-L596 | `left` / `right` | ported, `main.swift` |
+| L597-L608 | `setup` incl. `defaults delete` + `killall Dock` | changed; legacy cleanup **dropped** |
+| L609-L627 | setup message, teardown, version, usage | changed, `main.swift` |
+| L629-L655 | log, Accessibility wait | ported, `Daemon.swift` |
+| L656-L666 | auto-open System Settings | **dropped** |
+| L667-L678 | activation policy, yank-guard switch | changed, `Daemon.swift` |
+| L680-L700 | Carbon hotkey | changed, `Daemon.swift` |
+| L702-L795 | swipe tap | ported, `Daemon.swift` |
+| L797 | `app.run()` | ported, `Daemon.swift` |
+
+Not taken from noswoosh: `AGENTS.md`, `.github/workflows/release.yml`
+(signing secrets, Homebrew push), `scripts/landing-check.swift` (screen-recording
+test harness), `scripts/make-app-bundle.sh`, `scripts/Info.plist.in`, assets.
+
+## Final binary (spacehop 0.1.0, macOS 27.2.1 arm64)
+
+Linked libraries (`otool -L build/spacehop`):
+
+```
+/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight
+/usr/lib/libSystem.B.dylib
+/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit
+/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices
+/System/Library/Frameworks/Carbon.framework/Versions/A/Carbon
+/System/Library/Frameworks/ColorSync.framework/Versions/A/ColorSync
+/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation
+/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics
+/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation
+/usr/lib/libobjc.A.dylib
+/usr/lib/swift/libswiftCore.dylib
+/usr/lib/swift/libswiftCoreFoundation.dylib
+/usr/lib/swift/libswiftCoreImage.dylib
+/usr/lib/swift/libswiftDispatch.dylib
+/usr/lib/swift/libswiftIOKit.dylib
+/usr/lib/swift/libswiftMetal.dylib
+/usr/lib/swift/libswiftOSLog.dylib
+/usr/lib/swift/libswiftObjectiveC.dylib
+/usr/lib/swift/libswiftQuartzCore.dylib
+/usr/lib/swift/libswiftSpatial.dylib
+/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib
+/usr/lib/swift/libswiftXPC.dylib
+/usr/lib/swift/libswift_Builtin_float.dylib
+/usr/lib/swift/libswiftos.dylib
+/usr/lib/swift/libswiftsimd.dylib
+```
+
+Imported symbols outside the Swift runtime (`nm -u build/spacehop | grep -v '^_\$s\|^__swift\|^_swift_'`):
+
+```
+_AXIsProcessTrusted
+_AXIsProcessTrustedWithOptions
+_CFMachPortCreateRunLoopSource
+_CFPreferencesCopyAppValue
+_CFPreferencesCopyValue
+_CFPreferencesSetValue
+_CFPreferencesSynchronize
+_CFRunLoopAddSource
+_CFRunLoopGetCurrent
+_CFUUIDCreateString
+_CGDisplayCreateUUIDFromDisplayID
+_CGEventCreate
+_CGEventCreateFromData
+_CGEventGetDoubleValueField
+_CGEventGetIntegerValueField
+_CGEventGetLocation
+_CGEventGetTimestamp
+_CGEventPost
+_CGEventSetDoubleValueField
+_CGEventSetIntegerValueField
+_CGEventTapCreate
+_CGEventTapEnable
+_CGEventTapIsEnabled
+_CGGetDisplaysWithPoint
+_CGWindowListCopyWindowInfo
+_GetApplicationEventTarget
+_GetEventParameter
+_InstallEventHandler
+_NSApp
+_NSWorkspaceActiveSpaceDidChangeNotification
+_OBJC_CLASS_$_NSApplication
+_OBJC_CLASS_$_NSArray
+_OBJC_CLASS_$_NSFileHandle
+_OBJC_CLASS_$_NSNumber
+_OBJC_CLASS_$_NSOperationQueue
+_OBJC_CLASS_$_NSRunLoop
+_OBJC_CLASS_$_NSTimer
+_OBJC_CLASS_$_NSWorkspace
+_RegisterEventHotKey
+_SLSCopyManagedDisplaySpaces
+_SLSCopySpacesForWindows
+_SLSGetActiveSpace
+_SLSMainConnectionID
+_SLSSetSymbolicHotKeyEnabled
+__Block_copy
+__Block_release
+__NSConcreteStackBlock
+___chkstk_darwin
+___stack_chk_fail
+___stack_chk_guard
+_bzero
+_exit
+_getppid
+_kAXTrustedCheckOptionPrompt
+_kCFPreferencesAnyApplication
+_kCFPreferencesAnyHost
+_kCFPreferencesCurrentUser
+_kCFRunLoopCommonModes
+_kCGWindowLayer
+_kCGWindowNumber
+_mach_absolute_time
+_malloc_size
+_memcpy
+_memmove
+_objc_msgSend
+_objc_opt_self
+_objc_release
+_objc_retain
+_objc_retainAutoreleasedReturnValue
+_sysctlbyname
+```
+
+Scanner:
+
+```
+check-binary: OK (build/spacehop)
+```
