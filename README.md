@@ -73,6 +73,24 @@ tests/check-binary-test.sh   # the scanner rejects network/launch/dlopen binarie
 scripts/build.sh --test      # payload layout, edge clamp, natural-scrolling sign
 ```
 
+## How it works
+
+About 600 lines of Swift, no dependencies. If you want the same thing in your
+own app, read in this order:
+
+| File | What it does |
+|------|--------------|
+| [`Sources/Swipe.swift`](Sources/Swipe.swift) | The core trick. Posts a synthetic Dock-swipe gesture (began/changed/ended) with a huge fling velocity, so the Dock commits the switch in one frame. On macOS 27+ each event also needs a raw IOHID payload appended to its serialized form (`augment`). Also: edge clamping, natural-scrolling sign, and predicting the current Space during rapid presses. |
+| [`Sources/Spaces.swift`](Sources/Spaces.swift) | Finds the current Space and the list of Spaces on the display under the cursor, via private SkyLight calls (`SLSCopyManagedDisplaySpaces`, `SLSGetActiveSpace`). |
+| [`Sources/Daemon.swift`](Sources/Daemon.swift) | Inputs. Carbon `RegisterEventHotKey` for Ctrl+Left/Right; a `CGEventTap` limited to gesture events that swallows real horizontal three-finger swipes and replaces them with the instant switch; the "yank guard" that stops macOS from jumping back to the app you left when you land on an empty Space. |
+| [`Sources/SystemShortcuts.swift`](Sources/SystemShortcuts.swift) | Turns the system's own animated Ctrl+arrow shortcuts off/on so they don't fire too. |
+| [`Sources/main.swift`](Sources/main.swift) | CLI entry point. |
+
+Whatever triggers a switch, it ends in `switchSpace(right:)`. Posting events and
+the event tap both need Accessibility permission. Comments in the code record
+which numbers were measured on which macOS version; [`AUDIT.md`](AUDIT.md)
+explains each piece in more depth.
+
 ## Fragility
 
 spacehop relies on undocumented parts of macOS: private SkyLight functions and
