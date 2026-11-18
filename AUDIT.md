@@ -405,3 +405,11 @@ Scanner:
 ```
 check-binary: OK (build/spacehop)
 ```
+
+## Verified on the owner's Mac
+
+2026-11-18, macOS 27.2.1 (26B131), Apple silicon: `scripts/install.sh` ran
+cleanly; before the grant the daemon logged "waiting for Accessibility
+permission" and kept running; after the grant it restarted itself ("Accessibility
+granted, restarting to apply it", launchd run 2). The owner confirmed switching
+works.
