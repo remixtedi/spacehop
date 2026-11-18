@@ -138,3 +138,26 @@ Private APIs: none directly.
 Verdict: changed.
 Changes: `list` subcommand dropped (convenience only). `setup`/`teardown` are
 added back in "System shortcuts" without the `defaults`/`killall` calls.
+
+## System shortcuts
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L64-L84, L597-L619 (file `Sources/SystemShortcuts.swift`, `setup`/`teardown` in `Sources/main.swift`).
+Does: `spacehop setup` turns off macOS's own "Move left/right a space" shortcuts
+(symbolic hotkeys 79/81, Ctrl+Left/Right), both for the running session and in
+`com.apple.symbolichotkeys` for future logins, so Ctrl+arrow reaches spacehop.
+`spacehop teardown` turns them back on.
+Private APIs: `SLSSetSymbolicHotKeyEnabled` (SkyLight).
+Verdict: changed.
+Changes:
+- `dlopen`/`dlsym` lookup of `SLSSetSymbolicHotKeyEnabled` replaced with a direct
+  `@_silgen_name` declaration (the binary already links SkyLight), so the
+  scanner can forbid `dlopen`/`dlsym` outright.
+- `/usr/bin/defaults write … -dict-add` replaced with `CFPreferencesCopyValue` /
+  `CFPreferencesSetValue` that edits only entries 79 and 81 and keeps a binding
+  the user changed. No program is launched.
+- Legacy cleanup of `com.apple.dock workspaces-auto-swoosh` and `killall Dock`
+  (L599-L608) dropped: spacehop never sets that preference.
+Tested on this Mac (macOS 27.2.1): setup → 79/81 `enabled=false`; teardown twice
+→ `enabled=true`, no error; all other hotkey entries identical before and after.
+Side effect: entries 79/81 gain an explicit `value` with the macOS default
+binding (`[65535, 123|124, 8650752]`, type `standard`) if they had none.
