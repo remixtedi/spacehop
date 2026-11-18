@@ -74,3 +74,53 @@ Changes:
   `guard` that returns nil, so an unexpected result can't crash the daemon.
 - Added `activeSpaceID()` wrapper so the daemon doesn't touch `cid` directly.
 - Comments shortened; references to upstream issue numbers removed.
+
+## macOS 26 swipe
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L216-L271 (file `Sources/Swipe.swift`).
+Does: builds one synthetic Dock-swipe `CGEvent` per gesture phase (began,
+changed, ended) with progress ±1e-4 and velocity ±2000, tags it, and posts it to
+the session event stream. The Dock treats it as a finished three-finger swipe
+with nothing left to animate.
+Private APIs: undocumented CGEvent fields 55 (event type), 110 (HID type),
+123 (motion), 124 (progress), 129/130 (velocity), 132 (phase); event types
+29 (gesture) and 30 (Dock control); HID type 23 (Dock swipe).
+Verdict: OK.
+Changes: tag constant `noswooshEventTag` 0x4E535753 ('NSWS') → `spacehopEventTag`
+0x5348_4F50 ('SHOP').
+
+## macOS 27 payload
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L195-L214, L273-L408 (file `Sources/Swipe.swift`).
+Does: on macOS 27 the Dock only accepts a synthetic swipe whose serialized form
+carries a raw IOHID payload under field 4205. `generateIOHIDPayload` writes a
+28-byte queue header, a 40-byte fluid-touch gesture record, and on motion/end a
+28-byte velocity record, all little-endian, from the event's own fields only.
+`augment` appends that to the serialized event and rebuilds the event. Each
+Dock event is posted with a companion gesture event (type 29). Progress ±0.1
+(upstream measured 1e-4 → black landings on 27.0.1; ≥0.03 → none), fling
+±9999 on the end phase, sign flipped when Natural scrolling is off.
+Reads one system preference: `com.apple.swipescrolldirection` (read-only).
+Private APIs: as above, plus fields 115 (swipe mask), 125/126 (position), 4205
+(raw IOHID payload), and the serialized-event format (version 2 header).
+Verdict: changed.
+Changes:
+- Natural-scrolling sign split into a pure `postedSwipeSign(naturalScrolling:)`
+  (unit-tested) plus a cached `postedSign`.
+- Tag renamed as above.
+Tests: `test_fixed1616`, `test_payload_layout` (sizes 96/68, record sizes and
+types, phase byte), `test_augment_header`, `test_postedSign_naturalOff`.
+
+## Switch core
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L410-L467 (file `Sources/Swipe.swift`).
+Does: `switchSpace(right:)` looks up the Space list, uses its own prediction
+for 0.25 s (0.4 s on 27) after a switch so rapid presses aren't blocked by a
+stale list, stops at the first/last Space, then posts the full gesture. On 27
+all three events are built before any is posted, so a half gesture is never sent.
+Private APIs: via Space lookup and the swipe functions above.
+Verdict: changed.
+Changes: edge check extracted to `nextIndex(current:count:right:)` (unit-tested,
+`test_clamp_and_prediction`); behaviour identical. A code-only diff against
+upstream (comments and whitespace stripped) shows only these renames and the
+extraction.
