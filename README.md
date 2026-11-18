@@ -40,13 +40,14 @@ ordinary API use, not a deliberately hostile author; that's what `AUDIT.md` is f
 scripts/install.sh
 ```
 
-This makes a local code-signing identity (one time, in its own keychain), builds
-and scans the binary, copies it to `~/.local/bin/spacehop`, turns off the
-system's animated Ctrl+arrow shortcuts, and starts spacehop at login. Then allow
-it in System Settings > Privacy & Security > Accessibility. It restarts itself
-once allowed.
+This builds and scans the binary, copies it to `~/.local/bin/spacehop`, starts
+it at login, and turns off the system's animated Ctrl+arrow shortcuts. Then
+allow it in System Settings > Privacy & Security > Accessibility. It restarts
+itself once allowed.
 
-Run `scripts/install.sh` again after pulling changes.
+To update, pull and run `scripts/install.sh` again, then remove "spacehop" from
+the Accessibility list and allow it again. Each build is signed ad-hoc, so the
+permission belongs to that exact build and nothing else can inherit it.
 
 ## Uninstall
 
@@ -81,5 +82,4 @@ breaks, nothing unsafe happens; switching just stops working.
 
 ## Credits
 
-noswoosh (Max Mathys), InstantSpaceSwitcher (jurplel), Interspace (cnrad), and
-iss (joshuarli). Licence notices in [`NOTICE`](NOTICE).
+noswoosh (Max Mathys), InstantSpaceSwitcher (jurplel), and iss (joshuarli). Licence notices in [`NOTICE`](NOTICE).

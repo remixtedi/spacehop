@@ -8,7 +8,7 @@ is noted as such.
 Upstream snapshots audited:
 
 - noswoosh: `mmathys/noswoosh@14051ab58444c6868f603bee9a4daab12f9f6255`, file `noswoosh.swift`
-- Interspace: `cnrad/interspace@87c1c34672be921da33486ea91eb6cc0c84ad544`, file `scripts/setup-signing.sh`
+- Interspace: `cnrad/interspace@87c1c34672be921da33486ea91eb6cc0c84ad544`, file `scripts/setup-signing.sh` (ported, later removed; see "Signing (no key)")
 
 Entry format:
 
@@ -58,20 +58,20 @@ Notes:
 - Final review (fresh reviewer) found the first version used a denylist and
   missed 9 of the cases above. Replaced with the allowlist; all 9 are now tests.
 
-## Local signing identity
+## Signing (no key)
 
-Source: cnrad/interspace@87c1c34 `scripts/setup-signing.sh` L1-L57.
-Does: one time, makes a self-signed RSA-2048 code-signing certificate
-(CN `spacehop local signing`, codeSigning EKU only, not a CA, 10 years) with the
-system LibreSSL, imports it into a new keychain
-`~/Library/Keychains/spacehop-signing.keychain-db`, and stores that keychain's
-random password in `~/.config/spacehop/signing-keychain-password` (umask 077).
-Only `/usr/bin/codesign` may use the key. The login keychain is not touched.
-Temp files are removed on exit. Nothing leaves the Mac.
-Private APIs: none.
+Source: written for spacehop (`scripts/build.sh`).
+Does: signs every build ad-hoc (`codesign --sign -`, identifier
+`com.remixtedi.spacehop`). macOS ties the Accessibility grant to that exact
+build, so no other binary can inherit it.
 Verdict: OK.
-Changes: names and paths only (`interspace` → `spacehop`), comments updated.
-`diff` against upstream shows no other change.
+History: the first version ported Interspace's `scripts/setup-signing.sh`
+(cnrad/interspace@87c1c34, MIT): a self-signed identity in its own keychain,
+keychain password stored in `~/.config/spacehop/`. The final review pointed out
+that any program running as the user could read that password, sign its own
+binary with the same certificate, and inherit spacehop's Accessibility grant.
+The owner chose to remove the key entirely. Cost: after each rebuild the user
+removes and re-allows spacehop in Accessibility. No Interspace code remains.
 
 ## Space lookup
 
@@ -244,17 +244,15 @@ to `~/Library/Logs/spacehop.log`.
 
 Source: layout follows mmathys/noswoosh@14051ab `scripts/install.sh` and
 `scripts/uninstall.sh` (files `scripts/install.sh`, `scripts/uninstall.sh`).
-Does: install runs `setup-signing.sh` and `build.sh` (so the scanner always
-runs), copies the binary to `~/.local/bin/spacehop` as a fresh file, runs
+Does: install runs `build.sh` (so the scanner always runs), copies the binary to `~/.local/bin/spacehop` as a fresh file, runs
 `spacehop setup`, writes and loads a user LaunchAgent
 (`com.remixtedi.spacehop`: RunAtLoad, KeepAlive, Interactive, Aqua session
-only, stderr to `~/Library/Logs/spacehop.log`). Uninstall reverses all of it,
-deletes the signing keychain and `~/.config/spacehop`, and tells the user to
-remove the Accessibility entry by hand.
+only, stderr to `~/Library/Logs/spacehop.log`). Uninstall reverses all of it and
+tells the user to remove the Accessibility entry by hand.
 Verdict: changed.
-Changes: optional Developer ID signing dropped (local identity always);
+Changes: optional Developer ID signing dropped (ad-hoc always);
 `swiftc` invocation moved into `build.sh`; source file no longer copied next to
-the binary; uninstall also removes the signing identity and log; `spacehop setup`
+the binary; uninstall also removes the log; `spacehop setup`
 runs only after the LaunchAgent is loaded, so a failed install leaves the system
 Ctrl+arrow shortcuts working (upstream ran it before).
 Not automated on purpose: removing the Accessibility entry. `tccutil` can't

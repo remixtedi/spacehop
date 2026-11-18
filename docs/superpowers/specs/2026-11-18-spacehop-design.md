@@ -195,3 +195,12 @@ Nothing leaves the Mac before that approval. After approval, create
 
 - Exact denylist tuning if Swift runtime pulls in a benign symbol that matches.
 - Exact wording of README and log messages.
+
+## Changes after approval
+
+- 2026-11-18, owner decision after final review: no signing key. Builds are
+  signed ad-hoc; the "Accessibility survives rebuilds" goal is dropped because
+  the stored keychain password let any same-user program inherit the grant.
+  `setup-signing.sh` removed.
+- 2026-11-18, final review: binary scanner switched from a denylist to an exact
+  import allowlist (`scripts/allowed-imports.txt`).

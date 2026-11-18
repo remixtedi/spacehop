@@ -12,9 +12,6 @@ LOG="$HOME/Library/Logs/spacehop.log"
 
 command -v swiftc >/dev/null || { echo "swiftc not found. Install the Xcode Command Line Tools: xcode-select --install"; exit 1; }
 
-echo "==> Signing identity (one time)"
-scripts/setup-signing.sh
-
 echo "==> Building and scanning"
 scripts/build.sh
 
@@ -66,6 +63,10 @@ Installed. One step left, and only you can do it:
 
   System Settings > Privacy & Security > Accessibility: turn on "spacehop".
   (macOS asks just now. If it isn't listed: "+", Cmd+Shift+G, $BIN_DIR/spacehop)
+
+  After an update (re-running this script) the old permission no longer
+  matches the new build: select "spacehop" in that list, remove it with "-",
+  and allow it again.
 
 spacehop restarts itself once it's allowed. Then Ctrl+Left/Right and a
 three-finger swipe switch desktops instantly.

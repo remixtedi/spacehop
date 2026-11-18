@@ -6,7 +6,6 @@ set -uo pipefail
 BIN_DIR="$HOME/.local/bin"
 LABEL="com.remixtedi.spacehop"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-KEYCHAIN="$HOME/Library/Keychains/spacehop-signing.keychain-db"
 
 echo "==> Stopping and removing LaunchAgent"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
@@ -20,10 +19,8 @@ else
     echo "    Keyboard > Keyboard Shortcuts > Mission Control."
 fi
 
-echo "==> Removing binary, signing identity, and settings"
+echo "==> Removing binary and log"
 rm -f "$BIN_DIR/spacehop"
-[ -f "$KEYCHAIN" ] && security delete-keychain "$KEYCHAIN" 2>/dev/null
-rm -rf "$HOME/.config/spacehop"
 rm -f "$HOME/Library/Logs/spacehop.log"
 
 cat <<EOF
