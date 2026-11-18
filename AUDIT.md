@@ -53,3 +53,24 @@ Private APIs: none.
 Verdict: OK.
 Changes: names and paths only (`interspace` → `spacehop`), comments updated.
 `diff` against upstream shows no other change.
+
+## Space lookup
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L86-L167, L171-L183, L504-L516 (file `Sources/Spaces.swift`).
+Does: asks the window server for the list of Spaces per display and which one is
+showing; picks the display under the mouse cursor when there are several;
+checks whether a Space has any normal windows; reads the macOS major version
+from `kern.osproductversion`. Read-only, no side effects.
+Private APIs: `SLSMainConnectionID`, `SLSCopyManagedDisplaySpaces`,
+`SLSGetActiveSpace`, `SLSCopySpacesForWindows` (SkyLight, linked directly).
+Public APIs: `CGGetDisplaysWithPoint`, `CGDisplayCreateUUIDFromDisplayID`,
+`CGWindowListCopyWindowInfo` (window numbers and layers only; no titles,
+no contents), `sysctlbyname`.
+Verdict: changed.
+Changes:
+- `NOSWOOSH_FORCE_AUGMENT` environment override (L185-L192) removed;
+  `needsAugmentation` is `macOSMajor >= 27`.
+- Forced cast `as! [[String: Any]]` on the SkyLight result replaced with a
+  `guard` that returns nil, so an unexpected result can't crash the daemon.
+- Added `activeSpaceID()` wrapper so the daemon doesn't touch `cid` directly.
+- Comments shortened; references to upstream issue numbers removed.
