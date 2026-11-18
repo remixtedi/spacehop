@@ -19,7 +19,7 @@ report() { echo "check-binary: $1" >&2; bad=1; }
 ALLOWED_LIBS='^/usr/lib/libSystem\.B\.dylib$
 ^/usr/lib/libobjc\.A\.dylib$
 ^/usr/lib/swift/libswift[A-Za-z_]*\.dylib$
-^/System/Library/Frameworks/(Foundation|AppKit|Cocoa|Carbon|ApplicationServices|CoreFoundation|CoreGraphics|CoreServices)\.framework/
+^/System/Library/Frameworks/(Foundation|AppKit|Cocoa|Carbon|ApplicationServices|CoreFoundation|CoreGraphics|CoreServices|ColorSync)\.framework/
 ^/System/Library/PrivateFrameworks/SkyLight\.framework/'
 while read -r lib; do
     [ -z "$lib" ] && continue

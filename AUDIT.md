@@ -28,7 +28,7 @@ Changes: <what and why>
 Source: written for spacehop (`scripts/check-binary.sh`, `scripts/build.sh`, `tests/check-binary-test.sh`).
 Does: every build fails unless the binary links only allowlisted libraries
 (libSystem, libobjc, Swift runtime overlays, Foundation, AppKit, Cocoa, Carbon,
-ApplicationServices, CoreFoundation, CoreGraphics, CoreServices, SkyLight) and
+ApplicationServices, CoreFoundation, CoreGraphics, CoreServices, ColorSync, SkyLight) and
 imports no networking, process-launch, or dynamic-loading symbols or selectors.
 `tests/check-binary-test.sh` proves it rejects binaries using `URLSession`,
 `Process`, `dlopen`, and `socket`, and accepts a clean AppKit binary.
@@ -38,6 +38,9 @@ Notes: the Swift compiler auto-links weak overlay libraries such as
 `libswiftXPC` and `libswiftMetal` even when they are unused. They are allowed by
 the `libswift*` rule; actual use of networking or launching through them is
 still caught by the symbol and string checks.
+ColorSync is allowed because Apple implements
+`CGDisplayCreateUUIDFromDisplayID` (used by Space lookup) in it; it is a
+colour-management framework with no networking or launching role.
 
 ## Local signing identity
 
@@ -124,3 +127,14 @@ Changes: edge check extracted to `nextIndex(current:count:right:)` (unit-tested,
 `test_clamp_and_prediction`); behaviour identical. A code-only diff against
 upstream (comments and whitespace stripped) shows only these renames and the
 extraction.
+
+## CLI
+
+Source: mmathys/noswoosh@14051ab `noswoosh.swift` L582-L627, reduced (file `Sources/main.swift`).
+Does: `spacehop left|right` switches once and exits after 0.15 s so the posted
+events flush; `spacehop version` prints the version; anything else prints usage
+and exits 1.
+Private APIs: none directly.
+Verdict: changed.
+Changes: `list` subcommand dropped (convenience only). `setup`/`teardown` are
+added back in "System shortcuts" without the `defaults`/`killall` calls.
