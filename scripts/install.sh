@@ -26,9 +26,6 @@ launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 rm -f "$BIN_DIR/spacehop"
 cp build/spacehop "$BIN_DIR/spacehop"
 
-echo "==> Turning off the system's animated Ctrl+arrow shortcuts"
-"$BIN_DIR/spacehop" setup
-
 echo "==> Installing LaunchAgent $LABEL"
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<EOF
@@ -57,6 +54,11 @@ cat > "$PLIST" <<EOF
 EOF
 plutil -lint "$PLIST" >/dev/null
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+# Only after spacehop is running: if the steps above fail, Ctrl+arrow keeps
+# working the system way.
+echo "==> Turning off the system's animated Ctrl+arrow shortcuts"
+"$BIN_DIR/spacehop" setup
 
 cat <<EOF
 

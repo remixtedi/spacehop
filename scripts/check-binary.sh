@@ -1,21 +1,35 @@
 #!/bin/bash
-# Fails if a built binary can reach the network, launch programs, or load code at
-# runtime. Run by scripts/build.sh on every build.
+# Fails if a built binary can reach the network, launch programs, talk to other
+# processes, or load code at runtime. Run by scripts/build.sh on every build.
 #
 #   scripts/check-binary.sh build/spacehop
 #
-# Three independent checks, so one blind spot does not hide a problem:
-#   1. linked libraries must all be on an allowlist (otool -L)
-#   2. imported symbols must not be on a denylist (nm -u)
-#   3. Objective-C selector/class strings must not be on a denylist (strings)
+# Checks:
+#   1. the file is a Mach-O binary and every inspection tool succeeds
+#   2. linked libraries must all be on an allowlist (otool -L)
+#   3. imported C/Objective-C symbols must all be on scripts/allowed-imports.txt (nm -u)
+#   4. no Swift symbol may use Foundation's URL type (nm -u)
+#   5. no Objective-C selector/class string on a denylist (strings)
+# An allowlist rather than a denylist: anything new fails until reviewed.
 set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
 
 BIN="${1:?usage: check-binary.sh <binary>}"
 [ -f "$BIN" ] || { echo "check-binary: no such file: $BIN" >&2; exit 2; }
+ALLOWED_IMPORTS=scripts/allowed-imports.txt
 bad=0
 report() { echo "check-binary: $1" >&2; bad=1; }
+fail_hard() { echo "check-binary: $1" >&2; echo "check-binary: FAILED for $BIN" >&2; exit 1; }
 
-# 1. Libraries. Anything not matching one of these lines fails.
+# 1. Inspect once; any tool failure fails the check.
+lipo -archs "$BIN" >/dev/null 2>&1 || fail_hard "not a Mach-O binary"
+LIBS="$(otool -L "$BIN")" || fail_hard "otool failed"
+IMPORTS="$(nm -u "$BIN")" || fail_hard "nm failed"
+STRINGS="$(strings -a "$BIN")" || fail_hard "strings failed"
+[ -n "$IMPORTS" ] || fail_hard "nm returned no imports"
+[ -f "$ALLOWED_IMPORTS" ] || fail_hard "missing $ALLOWED_IMPORTS"
+
+# 2. Libraries.
 ALLOWED_LIBS='^/usr/lib/libSystem\.B\.dylib$
 ^/usr/lib/libobjc\.A\.dylib$
 ^/usr/lib/swift/libswift[A-Za-z_]*\.dylib$
@@ -24,27 +38,26 @@ ALLOWED_LIBS='^/usr/lib/libSystem\.B\.dylib$
 while read -r lib; do
     [ -z "$lib" ] && continue
     echo "$lib" | grep -Eq "$ALLOWED_LIBS" || report "library not allowed: $lib"
-done < <(otool -L "$BIN" | tail -n +2 | awk '{print $1}')
+done < <(echo "$LIBS" | tail -n +2 | awk '{print $1}')
 
-# 2. Imported symbols.
-DENIED_SYMBOLS='^_(socket|socketpair|connect|bind|listen|accept|sendto|recvfrom|getaddrinfo|gethostbyname)$
-^_(posix_spawn|posix_spawnp|execv|execve|execvp|execl|execle|execlp|fork|vfork|system|popen)$
-^_(dlopen|dlsym|NSCreateObjectFileImageFromMemory|NSLinkModule)$
-^_CFSocket
-^_CFStream
-^_CFHTTP
-^_CFURLConnection
-^_nw_
-^_OBJC_CLASS_\$_(NSURLSession|NSURLConnection|NSURLDownload|NSTask|NSXPCConnection|NSNetService|NSStream|NSInputStream|NSOutputStream|NSAppleScript|NSUserScriptTask|NSBundle)$'
+# 3. C and Objective-C imports: exact allowlist. Swift runtime and mangled Swift
+# symbols are handled by check 4.
 while read -r sym; do
-    report "denied symbol: $sym"
-done < <(nm -u "$BIN" | grep -E "$DENIED_SYMBOLS")
+    report "import not on allowlist: $sym"
+done < <(echo "$IMPORTS" | grep -v '^_\$s' | grep -v '^__swift' | grep -v '^_swift_' |
+         grep -vxF -f <(grep -v '^#' "$ALLOWED_IMPORTS"))
 
-# 3. Selector and class-name strings (catches calls that go through objc_msgSend).
-DENIED_STRINGS='URLSession|NSURLConnection|NSTask|openURL:|openURLs:|launchApplication|openApplicationAtURL|NSAppleScript|executeAndReturnError'
+# 4. Swift symbols: spacehop uses no URL, so any use of Foundation.URL (which every
+# Swift fetch, open, or bundle-load API takes) fails.
+while read -r sym; do
+    report "Swift symbol uses URL: $sym"
+done < <(echo "$IMPORTS" | grep -E '10Foundation3URLV')
+
+# 5. Selector and class-name strings (calls that go through objc_msgSend).
+DENIED_STRINGS='URLSession|NSURLConnection|NSTask|openURL:|openURLs:|openFile|launchApplication|openApplicationAtURL|NSAppleScript|executeAndReturnError|NSXPCConnection'
 while read -r s; do
     report "denied string: $s"
-done < <(strings -a "$BIN" | grep -E "$DENIED_STRINGS" | sort -u)
+done < <(echo "$STRINGS" | grep -E "$DENIED_STRINGS" | sort -u)
 
 if [ "$bad" -ne 0 ]; then
     echo "check-binary: FAILED for $BIN" >&2

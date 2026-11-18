@@ -5,3 +5,4 @@ build/
 *.pem
 *.keychain-db
 signing-keychain-password
+.idea/

@@ -18,13 +18,16 @@ What spacehop does not have, by design:
 - No network code of any kind, no updater, no telemetry.
 - No launching of other programs, no loading of code at runtime.
 - No settings read from environment variables or files.
-- No keyboard tap: macOS delivers only Ctrl+Left/Right to it.
+- No keyboard tap: macOS delivers only Ctrl+Left/Right to its code.
 - No third-party dependencies, no prebuilt downloads, no CI.
 
-Every build runs [`scripts/check-binary.sh`](scripts/check-binary.sh), which
-fails the build if the binary links anything outside a short list of Apple
-frameworks or imports any networking, process-launch, or dynamic-loading
-function. `tests/check-binary-test.sh` proves the scanner catches those.
+Every build runs [`scripts/check-binary.sh`](scripts/check-binary.sh). It fails
+the build if the binary links a library outside a short list of Apple frameworks,
+imports any C/Objective-C function not in
+[`scripts/allowed-imports.txt`](scripts/allowed-imports.txt), or uses a URL.
+`tests/check-binary-test.sh` proves it rejects 13 kinds of networking,
+app-launching, inter-process, and code-loading programs. A static scan catches
+ordinary API use, not a deliberately hostile author; that's what `AUDIT.md` is for.
 
 ## Requirements
 

@@ -25,22 +25,38 @@ Changes: <what and why>
 
 ## Binary scanner and build script
 
-Source: written for spacehop (`scripts/check-binary.sh`, `scripts/build.sh`, `tests/check-binary-test.sh`).
-Does: every build fails unless the binary links only allowlisted libraries
-(libSystem, libobjc, Swift runtime overlays, Foundation, AppKit, Cocoa, Carbon,
-ApplicationServices, CoreFoundation, CoreGraphics, CoreServices, ColorSync, SkyLight) and
-imports no networking, process-launch, or dynamic-loading symbols or selectors.
-`tests/check-binary-test.sh` proves it rejects binaries using `URLSession`,
-`Process`, `dlopen`, and `socket`, and accepts a clean AppKit binary.
+Source: written for spacehop (`scripts/check-binary.sh`, `scripts/allowed-imports.txt`,
+`scripts/build.sh`, `tests/check-binary-test.sh`).
+Does: every build fails unless
+1. the file is Mach-O and `otool`, `nm`, `strings` all succeed;
+2. every linked library is on a short allowlist (libSystem, libobjc, Swift
+   runtime overlays, Foundation, AppKit, Cocoa, Carbon, ApplicationServices,
+   CoreFoundation, CoreGraphics, CoreServices, ColorSync, SkyLight);
+3. every imported C/Objective-C symbol is listed in `scripts/allowed-imports.txt`
+   (an exact allowlist: anything new fails until someone adds it on purpose);
+4. no Swift symbol uses Foundation's `URL` type (spacehop uses none, and every
+   Swift fetch/open/bundle-load API takes one);
+5. no denylisted selector/class string appears (`URLSession`, `NSTask`,
+   `openURL:`, `openFile`, `launchApplication`, `NSXPCConnection`, …).
+`tests/check-binary-test.sh` builds the real program (must pass) and 13 hostile
+programs that must fail: `URLSession`, `Process`, `dlopen`, `socket`,
+`Data(contentsOf: https URL)`, `LSOpenCFURLRef`, `NSWorkspace.openFile`,
+`AESendMessage`, `xpc_connection_create_mach_service`, `DNSServiceQueryRecord`,
+`CFBundleLoadExecutable`, `NSClassFromString` with a runtime-built name, and a
+non-Mach-O file.
 Private APIs: none.
 Verdict: OK.
-Notes: the Swift compiler auto-links weak overlay libraries such as
-`libswiftXPC` and `libswiftMetal` even when they are unused. They are allowed by
-the `libswift*` rule; actual use of networking or launching through them is
-still caught by the symbol and string checks.
-ColorSync is allowed because Apple implements
-`CGDisplayCreateUUIDFromDisplayID` (used by Space lookup) in it; it is a
-colour-management framework with no networking or launching role.
+Limits: a static scan catches ordinary API use. It cannot stop a deliberately
+hostile author (raw system calls, code hidden in data); that is what reading
+every line, recorded below, is for.
+Notes:
+- Swift auto-links weak overlay libraries such as `libswiftXPC` and
+  `libswiftMetal` even when unused. The `libswift*` rule allows them; any actual
+  use of an API they wrap shows up as a new import and fails check 3.
+- ColorSync is allowed because Apple implements `CGDisplayCreateUUIDFromDisplayID`
+  (used by Space lookup) in it; it is a colour-management framework.
+- Final review (fresh reviewer) found the first version used a denylist and
+  missed 9 of the cases above. Replaced with the allowlist; all 9 are now tests.
 
 ## Local signing identity
 
@@ -190,8 +206,11 @@ the guard is always on, as upstream defaults to.
 
 Source: mmathys/noswoosh@14051ab `noswoosh.swift` L680-L700 (file `Sources/Daemon.swift`, `installHotKeys`).
 Does: registers exactly Ctrl+Left and Ctrl+Right with Carbon
-`RegisterEventHotKey`. macOS delivers only those two combinations to the
-process; spacehop never sees any other keystroke. There is no keyboard event tap.
+`RegisterEventHotKey`. macOS delivers only those two combinations to spacehop's
+code. There is no keyboard event tap. One caveat, from the yank guard: on an
+empty desktop spacehop is briefly the active app, so keys typed there go to
+its event queue, where AppKit discards them (it has no windows or menus). No
+spacehop code reads them.
 Private APIs: none.
 Verdict: changed.
 Changes: signature `0x5350_5357` ('SPSW') → `0x5348_4F50` ('SHOP'); the handler
@@ -216,8 +235,10 @@ diff against upstream shows nothing else.
 
 Source: mmathys/noswoosh@14051ab `noswoosh.swift` L670-L678, L797 (file `Sources/Daemon.swift`, `runDaemon`).
 Does: sets activation policy `.accessory` (no Dock icon, no Cmd-Tab), installs
-the yank guard, hotkeys and swipe tap, logs one line, runs the app loop.
-Verdict: OK.
+the yank guard, hotkeys and swipe tap, runs the app loop.
+Verdict: changed.
+Changes: added one startup log line (`running (spacehop <version>, macOS <major>)`)
+to `~/Library/Logs/spacehop.log`.
 
 ## Install and uninstall
 
@@ -233,7 +254,9 @@ remove the Accessibility entry by hand.
 Verdict: changed.
 Changes: optional Developer ID signing dropped (local identity always);
 `swiftc` invocation moved into `build.sh`; source file no longer copied next to
-the binary; uninstall also removes the signing identity and log.
+the binary; uninstall also removes the signing identity and log; `spacehop setup`
+runs only after the LaunchAgent is loaded, so a failed install leaves the system
+Ctrl+arrow shortcuts working (upstream ran it before).
 Not automated on purpose: removing the Accessibility entry. `tccutil` can't
 target a bare binary by ID, and `tccutil reset Accessibility` with no ID would
 remove every app's permission.
